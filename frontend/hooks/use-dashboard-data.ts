@@ -5,6 +5,7 @@ import { toast } from "sonner"
 export function useDashboardData(isAuthenticated: boolean) {
   const [assets, setAssets] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = useCallback(async (filters?: { start?: string; end?: string }) => {
@@ -16,13 +17,15 @@ export function useDashboardData(isAuthenticated: boolean) {
       if (filters?.start) params.startDate = filters.start
       if (filters?.end) params.endDate = filters.end
 
-      const [assetsRes, transactionsRes] = await Promise.all([
+      const [assetsRes, transactionsRes, historyRes] = await Promise.all([
         api.get("/assets"),
         api.get("/transactions", { params }),
+        api.get("/assets/history")
       ])
       
       setAssets(assetsRes.data.assets || [])
       setTransactions(transactionsRes.data || [])
+      setHistory(historyRes.data || [])
     } catch (err) {
       console.error("Error loading data:", err)
       toast.error("Erro ao carregar dados.")
@@ -35,5 +38,5 @@ export function useDashboardData(isAuthenticated: boolean) {
     loadData()
   }, [loadData])
 
-  return { assets, transactions, loading, refresh: loadData }
+  return { assets, transactions, history, loading, refresh: loadData }
 }

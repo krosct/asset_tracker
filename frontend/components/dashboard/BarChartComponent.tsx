@@ -35,7 +35,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data = dum
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">Transações Mensais (Fictício)</CardTitle>
+        <CardTitle className="text-2xl font-bold">Evolução do Patrimônio</CardTitle>
       </CardHeader>
       <CardContent className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -53,7 +53,7 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data = dum
             {/* Correção: Removidas as barras invertidas desnecessárias */}
             <YAxis stroke="#888888" tickFormatter={(value) => `R$ ${value / 1000}k`} />
             <Tooltip 
-                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, "Valor"]}
+                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, "Patrimônio"]}
                 labelFormatter={(label) => `Mês: ${label}`}
                 contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px' }}
             />

@@ -24,7 +24,7 @@ export default function DashboardPage() {
   const { isAuthenticated, loading: authLoading, logout } = useAuth()
   
   // Lógica extraída para hooks (mantendo a funcionalidade original)
-  const { assets, transactions, loading, refresh } = useDashboardData(isAuthenticated)
+  const { assets, transactions, history, loading, refresh } = useDashboardData(isAuthenticated)
   const { displayedTransactions, filters, sorting } = useTransactionFilters(transactions)
 
   // Estados de UI originais
@@ -168,8 +168,8 @@ export default function DashboardPage() {
             </div>
 
             {/* Gráfico de Barras no final como solicitado */}
-            {!loading && assets.length > 0 && (
-              <BarChartComponent data={assets} />
+            {!loading && history && history.length > 0 && (
+              <BarChartComponent data={history} />
             )}
           </>
         )}

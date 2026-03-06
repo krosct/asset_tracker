@@ -75,6 +75,7 @@ router.use(ensureAuthenticated);
  *         description: Ativo criado
  */
 router.get('/', AssetsController.list);
+router.get('/history', AssetsController.history);
 router.post('/', AssetsController.create);
 
 /**

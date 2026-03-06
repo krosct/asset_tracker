@@ -305,4 +305,129 @@ export class AssetsController {
       return res.status(400).json({ error: error.message })
     }
   }
+
+  // GET /assets/history
+  static async history(req: Request, res: Response) {
+    try {
+      const userId = 1;
+
+      // Obtém as transações do usuário
+      const [transactionsRows] = await mysqlPool.query(
+        `
+        SELECT 
+          t.asset_id,
+          t.type,
+          t.quantity,
+          t.price,
+          t.transaction_date,
+          a.symbol as ticker
+        FROM transactions t
+        JOIN assets a ON a.id = t.asset_id
+        WHERE t.user_id = ?
+        ORDER BY t.transaction_date ASC
+        `,
+        [userId]
+      );
+
+      const transactions = transactionsRows as any[];
+
+      // Agrupa as transações por mês/ano e calcula o patrimônio
+      // Simplificado: somando (quantidade acumulada) * preço_da_ultima_transacao_no_mes ou current_price atual
+      
+      const historyMap = new Map<string, number>();
+      
+      // Agrupar e calcular saldo mensal
+      // Isso seria mais preciso usando asset_daily_prices, mas vamos fazer um mock/calculo simples baseado nas transacoes ou precos atuais
+      
+      // Busca preços atuais
+      const [assetsRows] = await mysqlPool.query(
+        'SELECT id, current_price, avg_price FROM assets WHERE user_id = ?',
+        [userId]
+      );
+      
+      const pricesMap = new Map();
+      (assetsRows as any[]).forEach(row => {
+        pricesMap.set(row.id, row.current_price > 0 ? row.current_price : row.avg_price);
+      });
+
+      // Calcular a quantidade acumulada por mês
+      const monthlyQuantityMap = new Map<string, Map<number, number>>();
+      
+      // Inicializar alguns meses para ter um gráfico bonito se não houver muitas transações
+      const now = new Date();
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        monthlyQuantityMap.set(monthKey, new Map<number, number>());
+      }
+      
+      let currentQuantities = new Map<number, number>();
+      
+      for (const t of transactions) {
+        const date = new Date(t.transaction_date);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        
+        let qty = currentQuantities.get(t.asset_id) || 0;
+        if (t.type === 'BUY') {
+          qty += Number(t.quantity);
+        } else if (t.type === 'SELL') {
+          qty -= Number(t.quantity);
+        }
+        currentQuantities.set(t.asset_id, qty);
+        
+        // Atualiza para o mes atual da iteracao
+        if (monthlyQuantityMap.has(monthKey)) {
+          const mapForMonth = monthlyQuantityMap.get(monthKey)!;
+          mapForMonth.set(t.asset_id, qty);
+        } else {
+           // Se for um mês muito antigo
+           const mapForMonth = new Map<number, number>();
+           mapForMonth.set(t.asset_id, qty);
+           monthlyQuantityMap.set(monthKey, mapForMonth);
+        }
+      }
+      
+      // Preenche buracos de meses vazios com saldo do mês anterior
+      const sortedMonths = Array.from(monthlyQuantityMap.keys()).sort();
+      let lastMonthQuantities = new Map<number, number>();
+      
+      for (const month of sortedMonths) {
+        const monthQuantities = monthlyQuantityMap.get(month)!;
+        
+        // Mesclar com o anterior (o que não mudou continua igual)
+        for (const [assetId, qty] of Array.from(lastMonthQuantities.entries())) {
+          if (!monthQuantities.has(assetId)) {
+            monthQuantities.set(assetId, qty);
+          }
+        }
+        
+        lastMonthQuantities = new Map(monthQuantities);
+        
+        // Calcula valor total do mês
+        let monthTotal = 0;
+        for (const [assetId, qty] of Array.from(monthQuantities.entries())) {
+           const price = pricesMap.get(assetId) || 0;
+           monthTotal += qty * price;
+        }
+        
+        historyMap.set(month, monthTotal);
+      }
+
+      const result = sortedMonths.map(month => {
+        const [year, m] = month.split('-');
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return {
+          name: `${monthNames[parseInt(m) - 1]}/${year.substring(2)}`,
+          value: historyMap.get(month) || 0
+        };
+      });
+
+      // Retorna os últimos 6 meses
+      return res.json(result.slice(-6));
+
+    } catch (error: any) {
+       logger.error('Error fetching assets history:', error);
+       return res.status(500).json({ error: error.message });
+    }
+  }
 }
