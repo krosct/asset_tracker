@@ -1,0 +1,27 @@
+*.tsbuildinfo
+.eslintcache
+
+
+# Dependências
+node_modules/
+
+# Build do Next.js
+.next/
+out/
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Variáveis de ambiente (Segurança!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Sistema operacional
+.DS_Store
