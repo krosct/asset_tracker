@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import logger from '../../core/logger';
 import { mysqlPool } from '../../config/mysql';
+import { updatePrices } from '../../workers/priceUpdater';
 
 // Schemas
 const transactionSchema = z.object({
@@ -196,6 +197,13 @@ export class TransactionsController {
           );
 
           const newAssetId = (insertAssetResult as any).insertId;
+
+          // Atualiza dados na BRAPI (cotação, proventos etc.) assim que cria um novo ativo
+          try {
+            await updatePrices(true, tx.ticker);
+          } catch (err) {
+            logger.error(`Erro ao atualizar cotações e proventos na criação do ativo ${tx.ticker} via transação`, err);
+          }
 
           const [newAssetRows] = await mysqlPool.query(
             'SELECT * FROM assets WHERE id = ?',

@@ -1,0 +1,14 @@
+- [x] feat: verificação mais robusta de data de nascimento
+- [x] feat: textbox da confirmação da senha
+- [ ] feat: verificação da confirmação da senha em tempo real
+- [x] feat: olho para ver senha 
+- [x] feat: Banco de dados: histórico de dividendo
+- [x] fix: correção de bug front-back
+- [x] fix: pagina de login atualizando ao tentar login com credencial errada
+- [x] fix: botão de apagar e editar em cima do card de ativos no container Assets
+- [x] feat: Base de moeda: real
+- [x] feat: Grafico de dividendos
+- [x] feat: Valor do ativo, variação e valor total atualizado em "tempo real" (5min)
+- [x] fix: Quando um ativo é adicionado a carteira, o preço atual deve ser atualizado.
+- [ ] fix: Cor do gráfico de dividendo para verde
+- [ ] feat: Criar filtro para gráfico de dividendo por unidade de ativo ou valor total

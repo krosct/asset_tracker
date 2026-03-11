@@ -249,7 +249,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
                           disabled={assetTypeLocked}
                         />
                       ) : (
-                        <>
+                        <div className="space-y-2">
                           <Select
                             onValueChange={(value) => {
                               if (value === "custom") {
@@ -281,7 +281,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
                               {...field}
                             />
                           )}
-                        </>
+                        </div>
                       )}
                     </FormControl>
                     <FormMessage />

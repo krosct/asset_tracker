@@ -35,14 +35,17 @@ const CustomTooltip = ({ active, payload }: any) => {
 export function AllocationChart({ assets, onSliceClick }: AllocationChartProps) {
   // Agrupar por tipo (Setor ou Tipo de ativo)
   const data = assets.reduce((acc: any[], asset) => {
-    // Regra nova: Valor total depende apenas do current_price
-    const price = asset.current_price ? Number(asset.current_price) : 0
-    const value = Number(asset.quantity) * price
+    const avgPrice = Number(asset.averagePrice ?? asset.avg_price ?? asset.average_price ?? 0)
+    let price = Number(asset.currentPrice ?? asset.current_price ?? 0)
+    if (price === 0) {
+      price = avgPrice
+    }
+    const value = Number(asset.quantity || 0) * price
     
-    // Se o valor for 0, não contabiliza no gráfico para não quebrar a visualização
-    if (value <= 0) return acc
+    // Ignorar apenas se for negativo
+    if (value < 0) return acc
 
-    const type = asset.type || "Outros"
+    const type = asset.type || asset.sector || "Outros"
     const existing = acc.find((item) => item.name === type)
     
     if (existing) {
@@ -57,7 +60,7 @@ export function AllocationChart({ assets, onSliceClick }: AllocationChartProps) 
   const total = data.reduce((sum: number, item: any) => sum + item.value, 0)
   const dataWithPercent = data.map((item: any) => ({
     ...item,
-    percent: (item.value / total) * 100
+    percent: total > 0 ? (item.value / total) * 100 : 0
   }))
 
   const handlePieClick = (data: any) => {

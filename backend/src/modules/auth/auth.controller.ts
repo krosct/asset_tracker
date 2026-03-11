@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { supabase } from '../../config/supabase';
+import { mysqlPool } from '../../config/mysql';
 import { registerSchema, loginSchema, refreshTokenSchema } from './auth.schema';
 import logger from '../../core/logger';
 import { z } from 'zod';
@@ -69,24 +70,31 @@ export class AuthController {
     try {
       const data = loginSchema.parse(req.body);
 
-      const { data: sessionData, error } = await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: data.password,
-      });
+      // Nova lógica simples buscando no MySQL
+      const [rows]: any = await mysqlPool.query(
+        'SELECT id, email, password FROM users WHERE email = ?',
+        [data.email]
+      );
 
-      if (error) throw error;
+      if (rows.length === 0) {
+        return res.status(401).json({ error: "Invalid credentials or user not found." });
+      }
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('subscription_status')
-        .eq('id', sessionData.user.id)
-        .single();
+      const user = rows[0];
 
-      logger.info(`Login efetuado: ${data.email}`);
+      if (user.password !== data.password) {
+        return res.status(401).json({ error: "Invalid credentials or user not found." });
+      }
 
+      logger.info(`Login efetuado (MySQL mock): ${data.email}`);
+
+      // Retornar um token "fake" para satisfazer o frontend
       return res.json({
-        session: sessionData.session,
-        subscriptionStatus: profile?.subscription_status || 'inactive'
+        session: {
+          access_token: `fake-token-${user.id}`,
+          refresh_token: `fake-refresh-${user.id}`
+        },
+        subscriptionStatus: 'active'
       });
 
     } catch (error: any) {
@@ -115,45 +123,96 @@ export class AuthController {
     }
   }
 
+  // GET /auth/profile - Obter dados cadastrais
+  static async getProfile(req: Request, res: Response) {
+    try {
+      const userId = req.user.id; // O middleware sempre põe id: 1 na mock ou você usa o id real.
+      
+      const [rows]: any = await mysqlPool.query(
+        'SELECT id, full_name as fullName, username, email, phone, birthday as birthDate, address, gender FROM users WHERE id = ?',
+        [userId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Usuário não encontrado' });
+      }
+
+      return res.json({ profile: rows[0] });
+
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
   // PUT /auth/profile - Atualizar dados cadastrais
   static async updateProfile(req: Request, res: Response) {
     try {
-      // Schema simples para atualização
+      // Schema simples para atualização na tabela users
       const updateSchema = z.object({
         fullName: z.string().min(3).optional(),
+        username: z.string().min(3).optional(),
         phone: z.string().optional(),
         birthDate: z.string().optional(),
+        address: z.string().optional(),
+        gender: z.string().optional(),
+        password: z.string().optional(),
       });
 
       const data = updateSchema.parse(req.body);
       const userId = req.user.id;
 
-      // Atualiza no Supabase Auth (Opcional, se quiser manter sincronizado)
+      // Monta as queries de update baseadas no que foi enviado
+      const updates: string[] = [];
+      const values: any[] = [];
+
       if (data.fullName) {
-        await supabase.auth.updateUser({
-          data: { full_name: data.fullName }
-        });
+        updates.push('full_name = ?');
+        values.push(data.fullName);
+      }
+      if (data.username) {
+        updates.push('username = ?');
+        values.push(data.username);
+      }
+      if (data.phone !== undefined) {
+        updates.push('phone = ?');
+        values.push(data.phone || null);
+      }
+      if (data.birthDate !== undefined) {
+        updates.push('birthday = ?');
+        values.push(data.birthDate === "" ? null : data.birthDate);
+      }
+      if (data.address !== undefined) {
+        updates.push('address = ?');
+        values.push(data.address || null);
+      }
+      if (data.gender !== undefined) {
+        updates.push('gender = ?');
+        values.push(data.gender || null);
+      }
+      if (data.password) {
+        updates.push('password = ?');
+        values.push(data.password);
       }
 
-      // Atualiza na tabela Profiles
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: data.fullName,
-          phone: data.phone,
-          birth_date: data.birthDate || null,
-          updated_at: new Date()
-        })
-        .eq('id', userId)
-        .select()
-        .single();
+      if (updates.length > 0) {
+        values.push(userId);
+        await mysqlPool.query(
+          `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+          values
+        );
+      }
 
-      if (error) throw error;
-
-      return res.json({ message: 'Perfil atualizado', profile });
+      return res.json({ message: 'Perfil atualizado' });
 
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      logger.error('Erro no updateProfile:', error);
+      
+      let errorMessage = error.message;
+      if (error instanceof z.ZodError) {
+        errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      }
+      
+      return res.status(400).json({ error: errorMessage || 'Erro ao atualizar perfil' });
     }
   }
 

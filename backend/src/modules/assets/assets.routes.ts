@@ -76,6 +76,9 @@ router.use(ensureAuthenticated);
  */
 router.get('/', AssetsController.list);
 router.get('/history', AssetsController.history);
+router.get('/profitability', AssetsController.profitability);
+router.get('/dividends', AssetsController.dividends);
+router.post('/update-prices', AssetsController.updatePricesManual);
 router.post('/', AssetsController.create);
 
 /**

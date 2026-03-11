@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { Toaster } from "sonner"
 import "./globals.css"
 import { AuthProvider } from "@/hooks/use-auth"
 
@@ -9,8 +10,8 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "v0 App",
-  description: "Created with v0",
+  title: "Asset Tracker",
+  description: "Created by Group Decode Solution and Gabriel Monteiro",
   generator: "v0.app",
   icons: {
     icon: [
@@ -47,6 +48,7 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <AuthProvider>{children}</AuthProvider>
+        <Toaster position="top-right" />
         <Analytics />
       </body>
     </html>

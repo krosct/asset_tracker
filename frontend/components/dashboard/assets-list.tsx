@@ -64,17 +64,24 @@ export function AssetsList({ assets, onUpdate, filterType }: AssetsListProps) {
     }
   }
 
-  if (!assets || assets.length === 0) {
+  const filteredAssets = filterType
+    ? assets.filter(
+        (asset) =>
+          (asset.type || asset.sector || "Outros") === filterType
+      )
+    : assets
+
+  if (!filteredAssets || filteredAssets.length === 0) {
     return (
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
         <CardContent className="p-8 text-center text-muted-foreground">
-          Nenhum ativo encontrado. Clique em "Add Asset" para começar.
+          Nenhum ativo encontrado para o filtro selecionado.
         </CardContent>
       </Card>
     )
   }
 
-  const groupedAssets = assets.reduce((acc: any, asset: any) => {
+  const groupedAssets = filteredAssets.reduce((acc: any, asset: any) => {
     const groupKey = asset.type || asset.sector || "Outros"
     if (!acc[groupKey]) acc[groupKey] = []
     acc[groupKey].push(asset)
@@ -104,9 +111,8 @@ export function AssetsList({ assets, onUpdate, filterType }: AssetsListProps) {
 
                 const rawCurrentPrice =
                   asset.currentPrice ?? asset.current_price
-                const currentPrice = rawCurrentPrice
-                  ? Number(rawCurrentPrice)
-                  : avgPrice
+                let currentPrice = Number(rawCurrentPrice ?? 0)
+                if (currentPrice === 0) currentPrice = avgPrice
 
                 const quantity = Number(asset.quantity || 0)
                 const totalValue = quantity * currentPrice
@@ -178,9 +184,8 @@ export function AssetsList({ assets, onUpdate, filterType }: AssetsListProps) {
 
                         const rawCurrentPrice =
                           asset.currentPrice ?? asset.current_price
-                        const currentPrice = rawCurrentPrice
-                          ? Number(rawCurrentPrice)
-                          : avgPrice
+                        let currentPrice = Number(rawCurrentPrice ?? 0)
+                        if (currentPrice === 0) currentPrice = avgPrice
 
                         const quantity = Number(asset.quantity || 0)
                         const totalValue = quantity * currentPrice

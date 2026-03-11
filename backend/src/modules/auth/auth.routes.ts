@@ -179,6 +179,7 @@ router.post('/refresh', AuthController.refreshToken);
  *       200:
  *         description: Perfil atualizado
  */
+router.get('/profile', ensureAuthenticated, AuthController.getProfile);
 router.put('/profile', ensureAuthenticated, AuthController.updateProfile);
 
 router.post("/forgot-password", AuthController.forgotPassword);

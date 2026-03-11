@@ -11,31 +11,23 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Cell,
 } from 'recharts';
 
-interface BarChartData {
+interface ProfitabilityChartData {
   name: string;
   value: number;
 }
 
-interface BarChartComponentProps {
-  data?: BarChartData[]; // Tornar opcional para usar o default
+interface ProfitabilityChartComponentProps {
+  data?: ProfitabilityChartData[];
 }
 
-const dummyData: BarChartData[] = [
-  { name: 'Jan', value: 4000 },
-  { name: 'Fev', value: 3000 },
-  { name: 'Mar', value: 5000 },
-  { name: 'Abr', value: 4500 },
-  { name: 'Mai', value: 6000 },
-  { name: 'Jun', value: 5500 },
-];
-
-export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data = dummyData }) => {
+export const ProfitabilityChartComponent: React.FC<ProfitabilityChartComponentProps> = ({ data = [] }) => {
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">Evolução do Patrimônio</CardTitle>
+        <CardTitle className="text-2xl font-bold">Evolução da Rentabilidade</CardTitle>
       </CardHeader>
       <CardContent className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -50,17 +42,22 @@ export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data = dum
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
             <XAxis dataKey="name" stroke="#888888" />
-            {/* Correção: Removidas as barras invertidas desnecessárias */}
-            <YAxis stroke="#888888" tickFormatter={(value) => `R$ ${value / 1000}k`} />
+            <YAxis stroke="#888888" tickFormatter={(value) => `${value}%`} />
             <Tooltip 
-                formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR')}`, "Patrimônio"]}
+                formatter={(value: number) => [`${value}%`, "Rentabilidade"]}
                 labelFormatter={(label) => `Mês: ${label}`}
                 contentStyle={{ backgroundColor: '#27272a', border: '1px solid #3f3f46', borderRadius: '8px' }}
+                itemStyle={{ color: '#fff' }}
             />
-            <Bar dataKey="value" name="Valor Total" fill="#10b981" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="value" name="Rentabilidade (%)" radius={[4, 4, 0, 0]}>
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
   );
 };
+

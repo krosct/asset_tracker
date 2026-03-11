@@ -11,20 +11,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { SummaryCards } from "@/components/dashboard/summary-cards"
 import { AllocationChart } from "@/components/dashboard/allocation-chart"
-import { BarChartComponent } from "@/components/dashboard/BarChartComponent"
+import { ChartTabs } from "@/components/dashboard/ChartTabs"
 import { AssetsList } from "@/components/dashboard/assets-list"
 import { TransactionsList } from "@/components/dashboard/transactions-list"
 import { TransactionFiltersPanel } from "@/components/dashboard/transaction-filters-panel"
 import { AddAssetDialog } from "@/components/dashboard/add-asset-dialog"
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog"
-import { LogOut, TrendingUp, Plus, Filter, X } from "lucide-react"
+import { LogOut, TrendingUp, Plus, Filter, X, RefreshCw } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { api } from "@/lib/api"
 
 export default function DashboardPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const { isAuthenticated, loading: authLoading, logout } = useAuth()
   
   // Lógica extraída para hooks (mantendo a funcionalidade original)
-  const { assets, transactions, history, loading, refresh } = useDashboardData(isAuthenticated)
+  const { assets, transactions, history, profitability, loading, refresh } = useDashboardData(isAuthenticated)
   const { displayedTransactions, filters, sorting } = useTransactionFilters(transactions)
 
   // Estados de UI originais
@@ -34,6 +37,7 @@ export default function DashboardPage() {
   const [selectedAssetTypeFilter, setSelectedAssetTypeFilter] = useState<string | null>(null)
   const [addAssetOpen, setAddAssetOpen] = useState(false)
   const [addTransactionOpen, setAddTransactionOpen] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -50,6 +54,27 @@ export default function DashboardPage() {
   const handleLogout = () => {
     logout()
     router.push("/login")
+  }
+
+  const handleUpdatePrices = async () => {
+    try {
+      setIsUpdating(true)
+      await api.post('/assets/update-prices')
+      toast({
+        title: "Atualização concluída",
+        description: "Cotações e proventos foram atualizados com sucesso.",
+        variant: "default",
+      })
+      refresh()
+    } catch (error) {
+      toast({
+        title: "Erro na atualização",
+        description: "Não foi possível atualizar as cotações e proventos no momento.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   if (authLoading || !isAuthenticated) {
@@ -74,10 +99,29 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground">Portfolio Management</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="hover:bg-destructive/10 hover:text-destructive">
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleUpdatePrices} 
+              disabled={isUpdating}
+              className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10"
+              title="Atualizar cotações e proventos"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? 'animate-spin' : ''}`} />
+              Atualizar
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/dashboard")} className="text-emerald-500 font-medium">
+              Dashboard
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => router.push("/profile")}>
+              Perfil
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="hover:bg-destructive/10 hover:text-destructive">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -132,14 +176,14 @@ export default function DashboardPage() {
                       type="date" 
                       value={startDate} 
                       onChange={(e) => setStartDate(e.target.value)} 
-                      className="w-auto"
+                      className="w-auto [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert-[48%] [&::-webkit-calendar-picker-indicator]:sepia-[79%] [&::-webkit-calendar-picker-indicator]:saturate-[2476%] [&::-webkit-calendar-picker-indicator]:hue-rotate-[130deg] [&::-webkit-calendar-picker-indicator]:brightness-[96%] [&::-webkit-calendar-picker-indicator]:contrast-[101%]"
                     />
                     <span className="text-muted-foreground">-</span>
                     <Input 
                       type="date" 
                       value={endDate} 
                       onChange={(e) => setEndDate(e.target.value)} 
-                      className="w-auto"
+                      className="w-auto [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert-[48%] [&::-webkit-calendar-picker-indicator]:sepia-[79%] [&::-webkit-calendar-picker-indicator]:saturate-[2476%] [&::-webkit-calendar-picker-indicator]:hue-rotate-[130deg] [&::-webkit-calendar-picker-indicator]:brightness-[96%] [&::-webkit-calendar-picker-indicator]:contrast-[101%]"
                     />
                     <Button
                       onClick={() => setShowFilterPanel(!showFilterPanel)}
@@ -169,7 +213,7 @@ export default function DashboardPage() {
 
             {/* Gráfico de Barras no final como solicitado */}
             {!loading && history && history.length > 0 && (
-              <BarChartComponent data={history} />
+              <ChartTabs historyData={history} profitabilityData={profitability} assets={assets} />
             )}
           </>
         )}
