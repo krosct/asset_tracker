@@ -18,4 +18,6 @@
 - [ ] fix: Alterar para verde a cor da borda do grafico de dividendos
 - [ ] fix: Ajustar as porcentagens do detalhamento: de categoria e de ativos
 - [ ] fix: Quando uma categoria for completamente excluida, ela deve ser apagada do banco de dados
-- [ ] feat: Concluir CRUD de transactions
+- [x] feat: Concluir CRUD de transactions
+- [ ] fix: Trocar nome do arquivo do gráfico de patrimonio
+- [ ] feat: Limite de barras nos graficos (1000 é muita barra, portanto não da para ver nada)

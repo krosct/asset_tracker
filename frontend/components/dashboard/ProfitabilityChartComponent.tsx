@@ -30,10 +30,10 @@ interface ProfitabilityChartComponentProps {
 
 const getPeriodLabel = (periodicity: string) => {
   switch (periodicity) {
-    case 'Diário': return 'Dia';
-    case 'Semanal': return 'Semana';
-    case 'Trimestral': return 'Trimestre';
-    case 'Anual': return 'Ano';
+    case 'Daily': return 'Day';
+    case 'Weekly': return 'Week';
+    case 'Quarterly': return 'Quarter';
+    case 'Yearly': return 'Year';
     default: return 'Mês';
   }
 };
@@ -48,7 +48,7 @@ const CustomTooltip = ({ active, payload, label, periodicity = 'Mensal' }: any) 
       <div className="bg-[#27272a] border border-[#3f3f46] rounded-lg p-3 shadow-lg min-w-[200px] text-sm">
         <p className="font-semibold text-white mb-2 pb-1 border-b border-[#3f3f46]">{periodName}: {label}</p>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-zinc-400">Rentabilidade</span>
+          <span className="text-zinc-400">Profitability</span>
           <span className={`font-bold ${data.value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {data.value > 0 ? '+' : ''}{data.value.toFixed(2)}%
           </span>
@@ -103,7 +103,7 @@ export const ProfitabilityChartComponent: React.FC<ProfitabilityChartComponentPr
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">Evolução da Rentabilidade</CardTitle>
+        <CardTitle className="text-2xl font-bold">Profitability</CardTitle>
       </CardHeader>
       <CardContent className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -120,7 +120,7 @@ export const ProfitabilityChartComponent: React.FC<ProfitabilityChartComponentPr
             <XAxis dataKey="name" stroke="#888888" />
             <YAxis stroke="#888888" tickFormatter={(value) => `${value}%`} />
             <Tooltip content={<CustomTooltip periodicity={periodicity} />} cursor={{fill: 'transparent'}} />
-            <Bar dataKey="value" name="Rentabilidade (%)" radius={[4, 4, 0, 0]}>
+            <Bar dataKey="value" name="Profitability (%)" radius={[4, 4, 0, 0]}>
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.value >= 0 ? '#10b981' : '#ef4444'} />
               ))}

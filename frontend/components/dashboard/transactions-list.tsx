@@ -1,15 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ArrowUpCircle, ArrowDownCircle } from "lucide-react"
+import { ArrowUpCircle, ArrowDownCircle, Edit2, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { formatCurrency } from "@/lib/utils" // <--- Importação adicionada
+import { Button } from "@/components/ui/button"
 
 interface TransactionsListProps {
   transactions: any[]
+  onEdit?: (transaction: any) => void
+  onDelete?: (transaction: any) => void
 }
 
-export function TransactionsList({ transactions }: TransactionsListProps) {
+export function TransactionsList({ transactions, onEdit, onDelete }: TransactionsListProps) {
   if (transactions.length === 0) {
     return (
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
@@ -38,7 +41,7 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
               const date = transaction.transaction_date || transaction.date // Fallback para data
 
               return (
-                <div key={transaction.id} className="p-4 hover:bg-muted/5 transition-colors">
+                <div key={transaction.id} className="group relative p-4 hover:bg-muted/5 transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
@@ -66,6 +69,23 @@ export function TransactionsList({ transactions }: TransactionsListProps) {
                         </p>
                       </div>
                     </div>
+
+                    {/* Botões de Ação - Visíveis no hover */}
+                    <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity bg-background/40 backdrop-blur-[1px] pointer-events-none">
+                      <div className="pointer-events-auto flex items-center gap-2">
+                        {onEdit && (
+                          <Button size="icon" variant="secondary" onClick={() => onEdit(transaction)} className="h-8 w-8 rounded-full shadow-md hover:bg-emerald-500 hover:text-white transition-colors">
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button size="icon" variant="destructive" onClick={() => onDelete(transaction)} className="h-8 w-8 rounded-full shadow-md transition-colors">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="text-right">
                       <p className="font-semibold">
                         {/* Formatando valor total */}

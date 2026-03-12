@@ -6,6 +6,16 @@ import { useAuth } from "@/hooks/use-auth"
 import { useDashboardData } from "@/hooks/use-dashboard-data"
 import { useTransactionFilters } from "@/hooks/use-transaction-filters"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -35,7 +45,40 @@ export default function DashboardPage() {
   const [selectedAssetTypeFilter, setSelectedAssetTypeFilter] = useState<string | null>(null)
   const [addAssetOpen, setAddAssetOpen] = useState(false)
   const [addTransactionOpen, setAddTransactionOpen] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<any | null>(null)
+  const [transactionToDelete, setTransactionToDelete] = useState<any | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+
+  const handleEditTransaction = (transaction: any) => {
+    setTransactionToEdit(transaction)
+    setAddTransactionOpen(true)
+  }
+
+  const handleDeleteTransaction = (transaction: any) => {
+    setTransactionToDelete(transaction)
+  }
+
+  const confirmDeleteTransaction = async () => {
+    if (!transactionToDelete) return
+    
+    try {
+      await api.delete(`/transactions/${transactionToDelete.id}`)
+      toast({
+        title: "Transaction removed",
+        description: "The transaction was removed successfully.",
+        variant: "default",
+      })
+      refresh()
+    } catch (error) {
+      toast({
+        title: "Error while removing",
+        description: "An error occoured while trying to remove the transaction.",
+        variant: "destructive",
+      })
+    } finally {
+      setTransactionToDelete(null)
+    }
+  }
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -107,7 +150,7 @@ export default function DashboardPage() {
               Dashboard
             </Button>
             <Button variant="ghost" size="sm" onClick={() => router.push("/profile")}>
-              Perfil
+              Profile
             </Button>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="hover:bg-destructive/10 hover:text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
@@ -182,13 +225,20 @@ export default function DashboardPage() {
                         <X className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button onClick={() => setAddTransactionOpen(true)} className="bg-emerald-500 hover:bg-emerald-600">
+                    <Button onClick={() => {
+                      setTransactionToEdit(null)
+                      setAddTransactionOpen(true)
+                    }} className="bg-emerald-500 hover:bg-emerald-600">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
 
-                <TransactionsList transactions={displayedTransactions} />
+                <TransactionsList 
+                  transactions={displayedTransactions} 
+                  onEdit={handleEditTransaction}
+                  onDelete={handleDeleteTransaction}
+                />
               </div>
             </div>
 
@@ -203,10 +253,35 @@ export default function DashboardPage() {
       <AddAssetDialog open={addAssetOpen} onOpenChange={setAddAssetOpen} onSuccess={refresh} />
       <AddTransactionDialog 
         open={addTransactionOpen} 
-        onOpenChange={setAddTransactionOpen} 
+        onOpenChange={(open) => {
+          setAddTransactionOpen(open)
+          if (!open) setTransactionToEdit(null)
+        }} 
         onSuccess={refresh}
         assets={assets}
+        transactionToEdit={transactionToEdit}
       />
+
+      {/* Diálogo de Confirmação de Exclusão */}
+      <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => { if(!open) setTransactionToDelete(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Transaction</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this transaction? This action cannot be undone and can affect your wallet status.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteTransaction}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, remove it
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

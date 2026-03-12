@@ -33,7 +33,7 @@ export function TransactionFiltersPanel({ sorting, filters, assets = [] }: Filte
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
-        <ScrollArea className="h-[400px] w-full rounded-md">
+        <ScrollArea className="h-[300px] w-full rounded-md">
           <div className="p-4 space-y-4">
             <h4 className="font-medium text-sm leading-none mb-4">Filtros e Ordenação</h4>
 

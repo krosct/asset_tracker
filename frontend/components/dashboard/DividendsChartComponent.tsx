@@ -33,10 +33,10 @@ const dummyData: DividendsChartData[] = [
 
 const getPeriodLabel = (periodicity: string) => {
   switch (periodicity) {
-    case 'Diário': return 'Dia';
-    case 'Semanal': return 'Semana';
-    case 'Trimestral': return 'Trimestre';
-    case 'Anual': return 'Ano';
+    case 'Daily': return 'Day';
+    case 'Weekly': return 'Week';
+    case 'Quarterly': return 'Quarter';
+    case 'Yearly': return 'Year';
     default: return 'Mês';
   }
 };
@@ -51,7 +51,7 @@ const CustomTooltip = ({ active, payload, label, periodicity = 'Mensal' }: any) 
       <div className="bg-[#27272a] border border-[#3f3f46] rounded-lg p-3 shadow-lg min-w-[200px] text-sm">
         <p className="font-semibold text-white mb-2 pb-1 border-b border-[#3f3f46]">{periodName}: {label}</p>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-zinc-400">Dividendos</span>
+          <span className="text-zinc-400">Dividends</span>
           <span className="font-bold text-emerald-400">R$ {data.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         
@@ -107,7 +107,7 @@ export const DividendsChartComponent: React.FC<DividendsChartComponentProps> = (
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-purple-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">Dividendos Recebidos</CardTitle>
+        <CardTitle className="text-2xl font-bold">Dividends</CardTitle>
       </CardHeader>
       <CardContent className="h-[350px] w-full">
         {data.length === 0 ? (

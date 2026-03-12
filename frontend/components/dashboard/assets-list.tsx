@@ -335,9 +335,9 @@ export function AssetsList({ assets, onUpdate, filterType }: AssetsListProps) {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação excluirá permanentemente o ativo
+              This action will remove ticker permantly
               <span className="font-bold mx-1">
                 {deletingAsset?.ticker}
               </span>
@@ -350,7 +350,7 @@ export function AssetsList({ assets, onUpdate, filterType }: AssetsListProps) {
               onClick={confirmDelete}
               className="bg-red-500 hover:bg-red-600"
             >
-              Excluir
+              Remove
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

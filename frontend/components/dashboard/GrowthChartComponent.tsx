@@ -22,26 +22,26 @@ interface BarChartData {
   };
 }
 
-interface BarChartComponentProps {
+interface GrowthChartComponentProps {
   data?: BarChartData[]; // Tornar opcional para usar o default
   periodicity?: string;
 }
 
 const dummyData: BarChartData[] = [
   { name: 'Jan', value: 4000 },
-  { name: 'Fev', value: 3000 },
+  { name: 'Feb', value: 3000 },
   { name: 'Mar', value: 5000 },
-  { name: 'Abr', value: 4500 },
-  { name: 'Mai', value: 6000 },
+  { name: 'Apr', value: 4500 },
+  { name: 'May', value: 6000 },
   { name: 'Jun', value: 5500 },
 ];
 
 const getPeriodLabel = (periodicity: string) => {
   switch (periodicity) {
-    case 'Diário': return 'Dia';
-    case 'Semanal': return 'Semana';
-    case 'Trimestral': return 'Trimestre';
-    case 'Anual': return 'Ano';
+    case 'Daily': return 'Day';
+    case 'Weekly': return 'Week';
+    case 'Quarterly': return 'Quarter';
+    case 'Yearly': return 'Year';
     default: return 'Mês';
   }
 };
@@ -56,7 +56,7 @@ const CustomTooltip = ({ active, payload, label, periodicity = 'Mensal' }: any) 
       <div className="bg-[#27272a] border border-[#3f3f46] rounded-lg p-3 shadow-lg min-w-[200px] text-sm">
         <p className="font-semibold text-white mb-2 pb-1 border-b border-[#3f3f46]">{periodName}: {label}</p>
         <div className="flex justify-between items-center mb-3">
-          <span className="text-zinc-400">Patrimônio</span>
+          <span className="text-zinc-400">Growth Evolution</span>
           <span className="font-bold text-emerald-400">R$ {data.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         
@@ -109,11 +109,11 @@ const CustomTooltip = ({ active, payload, label, periodicity = 'Mensal' }: any) 
   return null;
 };
 
-export const BarChartComponent: React.FC<BarChartComponentProps> = ({ data = dummyData, periodicity = 'Mensal' }) => {
+export const GrowthChartComponent: React.FC<GrowthChartComponentProps> = ({ data = dummyData, periodicity = 'Mensal' }) => {
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-2xl font-bold">Evolução do Patrimônio</CardTitle>
+        <CardTitle className="text-2xl font-bold">Growth Evolution</CardTitle>
       </CardHeader>
       <CardContent className="h-[350px] w-full">
         <ResponsiveContainer width="100%" height="100%">

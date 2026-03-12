@@ -135,12 +135,100 @@ export class TransactionsController {
     }
   }
 
+  // Função auxiliar para recalcular saldo e PM do ativo
+  private static async recalculateAsset(assetId: number) {
+    const [txRows] = await mysqlPool.execute(
+      'SELECT type, quantity, price FROM transactions WHERE asset_id = ? ORDER BY transaction_date ASC, id ASC',
+      [assetId]
+    );
+    const transactions = txRows as any[];
+    
+    let currentQty = 0;
+    let currentAvg = 0;
+    
+    for (const tx of transactions) {
+      const txQty = Number(tx.quantity);
+      const txValue = Number(tx.price);
+      
+      if (tx.type === 'BUY') {
+        const totalOld = currentQty * currentAvg;
+        const totalNew = txQty * txValue;
+        currentQty += txQty;
+        currentAvg = currentQty > 0 ? (totalOld + totalNew) / currentQty : 0;
+      } else if (tx.type === 'SELL') {
+        currentQty -= txQty;
+        if (currentQty <= 0) {
+          currentQty = 0;
+          currentAvg = 0;
+        }
+      }
+    }
+    
+    await mysqlPool.execute(
+      'UPDATE assets SET quantity = ?, avg_price = ?, updated_at = NOW() WHERE id = ?',
+      [currentQty, currentAvg, assetId]
+    );
+  }
+
   // DELETE /transactions/:id
   static async delete(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const userId = req.user.id;
+      
+      // Busca a transação e o ativo para recalcular o preço médio e saldo
+      const [txRows] = await mysqlPool.execute('SELECT * FROM transactions WHERE id = ?', [id]);
+      if ((txRows as any[]).length === 0) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+      const tx = (txRows as any[])[0];
+
+      // Deleta a transação
       await mysqlPool.execute('DELETE FROM transactions WHERE id = ?', [id]);
+      
+      // Recalcula o saldo do ativo e o preço médio
+      await TransactionsController.recalculateAsset(tx.asset_id);
+      
       return res.status(204).send();
+    } catch (error: any) {
+      return res.status(400).json({ error: error.message });
+    }
+  }
+
+  // PUT /transactions/:id
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      const txData = transactionSchema.parse(req.body);
+
+      // Verify transaction exists
+      const [txRows] = await mysqlPool.execute('SELECT * FROM transactions WHERE id = ?', [id]);
+      if ((txRows as any[]).length === 0) {
+        return res.status(404).json({ error: 'Transaction not found' });
+      }
+
+      const tx = (txRows as any[])[0];
+
+      await mysqlPool.execute(
+        `
+        UPDATE transactions
+        SET type = ?, quantity = ?, price = ?, transaction_date = ?
+        WHERE id = ?
+        `,
+        [
+          txData.type,
+          txData.quantity,
+          txData.value,
+          txData.date ? new Date(txData.date) : new Date(),
+          id
+        ]
+      );
+
+      // Recalcula o saldo do ativo e o preço médio
+      await TransactionsController.recalculateAsset(tx.asset_id);
+
+      return res.status(200).json({ message: 'Transaction updated successfully' });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
     }

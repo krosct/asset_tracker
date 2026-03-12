@@ -42,8 +42,8 @@ export function AllocationChart({ assets, onSliceClick }: AllocationChartProps) 
     }
     const value = Number(asset.quantity || 0) * price
     
-    // Ignorar apenas se for negativo
-    if (value < 0) return acc
+    // Ignorar se for negativo ou zero
+    if (value <= 0) return acc
 
     const type = asset.type || asset.sector || "Outros"
     const existing = acc.find((item) => item.name === type)
@@ -72,7 +72,7 @@ export function AllocationChart({ assets, onSliceClick }: AllocationChartProps) 
   return (
     <div className="h-[300px] w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+        <PieChart key={JSON.stringify(dataWithPercent)}>
           <Pie
             data={dataWithPercent}
             cx="50%"

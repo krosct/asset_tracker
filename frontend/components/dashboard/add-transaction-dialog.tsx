@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -59,9 +59,10 @@ interface AddTransactionDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
   assets?: any[]
+  transactionToEdit?: any | null
 }
 
-export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [] }: AddTransactionDialogProps) {
+export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [], transactionToEdit = null }: AddTransactionDialogProps) {
   const [loading, setLoading] = useState(false)
   const [assetTypeLocked, setAssetTypeLocked] = useState(false)
   const [showCustomAssetTypeInput, setShowCustomAssetTypeInput] = useState(false)
@@ -84,6 +85,61 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
     },
   })
 
+  // Popula o form quando um transactionToEdit é passado
+  useEffect(() => {
+    if (open && transactionToEdit) {
+      const ticker = transactionToEdit.asset?.ticker || transactionToEdit.ticker || ""
+      const type = transactionToEdit.type === "BUY" ? "BUY" : "SELL"
+      const quantity = Number(transactionToEdit.quantity || 0)
+      const value = Number(transactionToEdit.value || transactionToEdit.price || 0)
+      
+      let dateStr = new Date().toISOString().split("T")[0]
+      if (transactionToEdit.transaction_date || transactionToEdit.date) {
+        const d = new Date(transactionToEdit.transaction_date || transactionToEdit.date)
+        if (!isNaN(d.getTime())) {
+          dateStr = d.toISOString().split("T")[0]
+        }
+      }
+
+      form.reset({
+        ticker,
+        type,
+        quantity,
+        value,
+        date: dateStr,
+        assetType: "",
+        sector: "",
+      })
+
+      // Try to find the asset to lock type
+      if (assets && assets.length > 0) {
+        const existing = assets.find((asset) => {
+          const t = asset.ticker || asset.symbol
+          return typeof t === "string" && t.toUpperCase() === ticker.toUpperCase()
+        })
+
+        if (existing) {
+          const inferredType = existing.type || existing.asset_type || "Ação"
+          form.setValue("assetType", inferredType)
+          setAssetTypeLocked(true)
+        }
+      }
+    } else if (open && !transactionToEdit) {
+      // Reset form if opening without transactionToEdit
+      form.reset({
+        ticker: "",
+        type: "BUY",
+        quantity: 0,
+        value: 0,
+        date: new Date().toISOString().split("T")[0],
+        assetType: "",
+        sector: "",
+      })
+      setAssetTypeLocked(false)
+      setShowCustomAssetTypeInput(false)
+    }
+  }, [open, transactionToEdit, form, assets])
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
       setLoading(true)
@@ -98,15 +154,21 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
         date: new Date(values.date).toISOString(), 
       }
 
-      await api.post("/transactions", payload)
+      if (transactionToEdit) {
+        await api.put(`/transactions/${transactionToEdit.id}`, payload)
+        toast.success("Transaction updated successfully")
+      } else {
+        await api.post("/transactions", payload)
+        toast.success("Transaction added successfully")
+      }
       
-      toast.success("Transaction added successfully")
       form.reset()
       onSuccess()
+      onOpenChange(false)
     } catch (error: any) {
       console.error("Erro ao enviar:", error.response?.data || error)
       // Mostra mensagem amigável se o backend retornar erro
-      const errorMsg = error.response?.data?.error || "Failed to add transaction. Check your inputs."
+      const errorMsg = error.response?.data?.error || "Failed to save transaction. Check your inputs."
       toast.error(errorMsg)
     } finally {
       setLoading(false)
@@ -117,8 +179,10 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add Transaction</DialogTitle>
-          <DialogDescription>Record a new buy or sell transaction.</DialogDescription>
+          <DialogTitle>{transactionToEdit ? "Edit Transaction" : "Add Transaction"}</DialogTitle>
+          <DialogDescription>
+            {transactionToEdit ? "Update the details of your transaction." : "Record a new buy or sell transaction."}
+          </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -239,7 +303,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
                 name="assetType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs text-muted-foreground">Type (New Assets)</FormLabel>
+                    <FormLabel className="text-xs text-muted-foreground">Category</FormLabel>
                     <FormControl>
                       {assetTypeLocked ? (
                         <Input
@@ -263,7 +327,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
                             value={showCustomAssetTypeInput ? "custom" : field.value}
                           >
                             <SelectTrigger className="h-8 text-sm">
-                              <SelectValue placeholder="Select asset type" />
+                              <SelectValue placeholder="Select category" />
                             </SelectTrigger>
                             <SelectContent>
                               {availableAssetTypes.map((type) => (
@@ -271,13 +335,13 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
                                   {type}
                                 </SelectItem>
                               ))}
-                              <SelectItem value="custom">Outro (Digitar)</SelectItem>
+                              <SelectItem value="custom">Enter New Category</SelectItem>
                             </SelectContent>
                           </Select>
                           {showCustomAssetTypeInput && (
                             <Input
                               className="h-8 text-sm mt-2"
-                              placeholder="Digite um novo tipo..."
+                              placeholder="Enter new category..."
                               {...field}
                             />
                           )}
@@ -306,7 +370,7 @@ export function AddTransactionDialog({ open, onOpenChange, onSuccess, assets = [
             <DialogFooter>
               <Button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600" disabled={loading}>
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Transaction
+                {transactionToEdit ? "Save Changes" : "Add Transaction"}
               </Button>
             </DialogFooter>
           </form>

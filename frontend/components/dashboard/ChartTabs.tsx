@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Filter } from "lucide-react";
-import { BarChartComponent } from "./BarChartComponent";
+import { GrowthChartComponent } from "./GrowthChartComponent";
 import { ProfitabilityChartComponent } from "./ProfitabilityChartComponent";
 import { DividendsChartComponent } from "./DividendsChartComponent";
 import { Input } from "@/components/ui/input";
@@ -69,19 +69,19 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
 
   return (
     <div className="w-full mt-8 space-y-6">
-      <Tabs defaultValue="patrimonio" className="w-full">
+      <Tabs defaultValue="growth_evolution" className="w-full">
         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-0 justify-between mb-6">
           <div className="hidden sm:block flex-1" />
           
           <TabsList className="grid w-full sm:w-auto sm:min-w-[400px] max-w-2xl grid-cols-3 bg-card/50 backdrop-blur-sm border border-border/50">
-            <TabsTrigger value="patrimonio" className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-500">
-              Patrimônio
+            <TabsTrigger value="growth_evolution" className="data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-500">
+              Growth Evolution
             </TabsTrigger>
-            <TabsTrigger value="rentabilidade" className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
-              Rentabilidade
+            <TabsTrigger value="profitability" className="data-[state=active]:bg-blue-500/20 data-[state=active]:text-blue-500">
+              Profitability
             </TabsTrigger>
-            <TabsTrigger value="dividendos" className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-500">
-              Dividendos
+            <TabsTrigger value="dividends" className="data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-500">
+              Dividends
             </TabsTrigger>
           </TabsList>
           
@@ -103,11 +103,11 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
                         <SelectValue placeholder="Mensal" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Diário">Diário</SelectItem>
-                        <SelectItem value="Semanal">Semanal</SelectItem>
+                        <SelectItem value="Daily">Daily</SelectItem>
+                        <SelectItem value="Weekly">Weekly</SelectItem>
                         <SelectItem value="Mensal">Mensal</SelectItem>
-                        <SelectItem value="Trimestral">Trimestral</SelectItem>
-                        <SelectItem value="Anual">Anual</SelectItem>
+                        <SelectItem value="Quarterly">Quarterly</SelectItem>
+                        <SelectItem value="Yearly">Yearly</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -211,17 +211,17 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
           </div>
         </div>
         
-        <TabsContent value="patrimonio" className="mt-0 relative">
+        <TabsContent value="growth_evolution" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
-          <BarChartComponent data={historyData} periodicity={periodicity} />
+          <GrowthChartComponent data={historyData} periodicity={periodicity} />
         </TabsContent>
         
-        <TabsContent value="rentabilidade" className="mt-0 relative">
+        <TabsContent value="profitability" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
           <ProfitabilityChartComponent data={profitabilityData} periodicity={periodicity} />
         </TabsContent>
 
-        <TabsContent value="dividendos" className="mt-0 relative">
+        <TabsContent value="dividends" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
           <DividendsChartComponent data={dividendsData} periodicity={periodicity} />
         </TabsContent>

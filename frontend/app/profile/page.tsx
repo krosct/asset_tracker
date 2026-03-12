@@ -156,7 +156,7 @@ export default function ProfilePage() {
               Dashboard
             </Button>
             <Button variant="ghost" size="sm" onClick={() => router.push("/profile")} className="text-emerald-500 font-medium">
-              Perfil
+              Profile
             </Button>
             <Button variant="ghost" size="sm" onClick={handleLogout} className="hover:bg-destructive/10 hover:text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
@@ -173,32 +173,32 @@ export default function ProfilePage() {
             <User className="h-6 w-6 text-emerald-500" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold">Meu Perfil</h2>
-            <p className="text-sm text-muted-foreground">Gerencie suas informações pessoais e configurações de conta</p>
+            <h2 className="text-2xl font-bold">My Profile</h2>
+            <p className="text-sm text-muted-foreground">Manage your personal informations and account settings</p>
           </div>
         </div>
 
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg shadow-emerald-500/5">
           <CardHeader>
-            <CardTitle>Informações Pessoais</CardTitle>
+            <CardTitle>Personal Information</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Nome Completo</Label>
+                  <Label htmlFor="fullName">Full Name</Label>
                   <Input 
                     id="fullName" 
                     name="fullName" 
                     value={formData.fullName} 
                     onChange={handleChange} 
-                    placeholder="Seu nome completo" 
+                    placeholder="Full Name" 
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="username">Nome de Usuário</Label>
+                  <Label htmlFor="username">Username</Label>
                   <Input 
                     id="username" 
                     name="username" 
@@ -219,11 +219,11 @@ export default function ProfilePage() {
                     placeholder="seu@email.com" 
                     disabled 
                   />
-                  <p className="text-xs text-muted-foreground">O e-mail não pode ser alterado diretamente.</p>
+                  <p className="text-xs text-muted-foreground">E-mail can't be modified directly.</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
+                  <Label htmlFor="phone">Phone</Label>
                   <Input 
                     id="phone" 
                     name="phone" 
@@ -234,7 +234,7 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="birthDate">Data de Nascimento</Label>
+                  <Label htmlFor="birthDate">Birthday</Label>
                   <Input 
                     id="birthDate" 
                     name="birthDate" 
@@ -246,22 +246,22 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="gender">Gênero</Label>
+                  <Label htmlFor="gender">Gender</Label>
                   <Select value={formData.gender} onValueChange={(val) => handleSelectChange("gender", val)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione..." />
+                      <SelectValue placeholder="Select..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="masculino">Masculino</SelectItem>
-                      <SelectItem value="feminino">Feminino</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                      <SelectItem value="prefiro_nao_dizer">Prefiro não dizer</SelectItem>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="prefer_not_to_say">Prefer not to say</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="address">Endereço Completo</Label>
+                  <Label htmlFor="address">Full Address</Label>
                   <Input 
                     id="address" 
                     name="address" 
@@ -272,26 +272,26 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2 pt-4 border-t border-border/50">
-                  <Label htmlFor="password">Nova Senha (opcional)</Label>
+                  <Label htmlFor="password">New Password (optional)</Label>
                   <Input 
                     id="password" 
                     name="password" 
                     type="password" 
                     value={formData.password} 
                     onChange={handleChange} 
-                    placeholder="Preencha apenas se quiser alterar a senha" 
+                    placeholder="Fill it if you want to change your password" 
                   />
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="confirmPassword">Confirmar Nova Senha</Label>
+                  <Label htmlFor="confirmPassword">Confirm New Password</Label>
                   <Input 
                     id="confirmPassword" 
                     name="confirmPassword" 
                     type="password" 
                     value={formData.confirmPassword} 
                     onChange={handleChange} 
-                    placeholder="Confirme a sua nova senha" 
+                    placeholder="Confirm New Password" 
                   />
                 </div>
 
@@ -304,7 +304,7 @@ export default function ProfilePage() {
                   ) : (
                     <>
                       <Save className="h-4 w-4 mr-2" />
-                      Salvar Alterações
+                      Save
                     </>
                   )}
                 </Button>

@@ -153,5 +153,6 @@ router.post('/bulk', TransactionsController.bulkCreate);
  *         description: Removido com sucesso
  */
 router.delete('/:id', TransactionsController.delete);
+router.put('/:id', TransactionsController.update);
 
 export default router;

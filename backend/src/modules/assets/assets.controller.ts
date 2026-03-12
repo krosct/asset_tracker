@@ -23,18 +23,18 @@ function getPeriodKey(date: Date, periodicity: string): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   
-  if (periodicity === 'Diário') return `${y}-${m}-${d}`;
-  if (periodicity === 'Semanal') {
+  if (periodicity === 'Daily') return `${y}-${m}-${d}`;
+  if (periodicity === 'Weekly') {
     const firstDayOfYear = new Date(y, 0, 1);
     const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
     const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
     return `${y}-W${String(weekNum).padStart(2, '0')}`;
   }
-  if (periodicity === 'Trimestral') {
+  if (periodicity === 'Quarterly') {
     const q = Math.ceil((date.getMonth() + 1) / 3);
     return `${y}-Q${q}`;
   }
-  if (periodicity === 'Anual') return `${y}`;
+  if (periodicity === 'Yearly') return `${y}`;
   
   return `${y}-${m}`;
 }
@@ -43,20 +43,20 @@ function formatPeriodName(key: string, periodicity: string): string {
   const parts = key.split('-');
   const y = parts[0].substring(2);
   
-  if (periodicity === 'Diário') {
+  if (periodicity === 'Daily') {
     return `${parts[2]}/${parts[1]}/${y}`;
   }
-  if (periodicity === 'Semanal') {
+  if (periodicity === 'Weekly') {
     return `${parts[1]}/${y}`;
   }
-  if (periodicity === 'Trimestral') {
+  if (periodicity === 'Quarterly') {
     return `${parts[1]}/${y}`;
   }
-  if (periodicity === 'Anual') {
+  if (periodicity === 'Yearly') {
     return `${parts[0]}`;
   }
   
-  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Set', 'Out', 'Nov', 'Dec'];
   const m = parseInt(parts[1], 10);
   return `${monthNames[m - 1]}/${y}`;
 }
@@ -65,18 +65,18 @@ function parsePeriodDate(key: string, periodicity: string): Date {
   const parts = key.split('-');
   const y = parseInt(parts[0], 10);
   
-  if (periodicity === 'Diário') {
+  if (periodicity === 'Daily') {
     return new Date(y, parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
   }
-  if (periodicity === 'Semanal') {
+  if (periodicity === 'Weekly') {
     const w = parseInt(parts[1].substring(1), 10);
     return new Date(y, 0, 1 + (w - 1) * 7);
   }
-  if (periodicity === 'Trimestral') {
+  if (periodicity === 'Quarterly') {
     const q = parseInt(parts[1].substring(1), 10);
     return new Date(y, (q - 1) * 3, 1);
   }
-  if (periodicity === 'Anual') {
+  if (periodicity === 'Yearly') {
     return new Date(y, 0, 1);
   }
   
@@ -112,7 +112,7 @@ export class AssetsController {
           a.symbol AS ticker,
           a.name,
           at.name AS type,
-          a.quantity,
+          COALESCE(SUM(CASE WHEN t.type = 'BUY' THEN t.quantity ELSE -t.quantity END), 0) AS quantity,
           a.avg_price,
           COALESCE((
             SELECT current_price 
@@ -125,7 +125,10 @@ export class AssetsController {
           a.first_purchase_date
         FROM assets a
         JOIN asset_types at ON at.id = a.asset_type_id
+        LEFT JOIN transactions t ON t.asset_id = a.id
         WHERE a.user_id = ?
+        GROUP BY a.id
+        HAVING quantity > 0
         `,
         [userId],
       )
@@ -481,10 +484,10 @@ export class AssetsController {
 
       // Calcula dividendos multiplicando o valor da cota pela quantidade possuída na data com (ou data de pagamento se nula)
       let dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y-%m')`;
-      if (periodicity === 'Diário') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y-%m-%d')`;
-      else if (periodicity === 'Semanal') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-W', LPAD(WEEK(ad.payment_date, 1), 2, '0'))`;
-      else if (periodicity === 'Trimestral') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-Q', QUARTER(ad.payment_date))`;
-      else if (periodicity === 'Anual') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y')`;
+      if (periodicity === 'Daily') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y-%m-%d')`;
+      else if (periodicity === 'Weekly') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-W', LPAD(WEEK(ad.payment_date, 1), 2, '0'))`;
+      else if (periodicity === 'Quarterly') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-Q', QUARTER(ad.payment_date))`;
+      else if (periodicity === 'Yearly') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y')`;
 
       const query = `
         SELECT 
@@ -510,7 +513,7 @@ export class AssetsController {
       // Primeiro param é pro sub-select e o resto pra query principal
       const [rows] = await mysqlPool.query(query, [userId, ...params]);
 
-      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Set', 'Out', 'Nov', 'Dec'];
       
       const monthlyData = new Map<string, {
         total: number,
@@ -619,13 +622,23 @@ export class AssetsController {
       // Build monthly quantities
       const monthlyQuantityMap = new Map<string, Map<number, number>>();
       const now = new Date();
-      if (periodicity === 'Mensal') {
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const monthKey = getPeriodKey(d, String(periodicity));
-          monthlyQuantityMap.set(monthKey, new Map<number, number>());
-        }
+      
+      let firstDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      if (transactions.length > 0) {
+        const tDate = new Date(transactions[0].transaction_date);
+        if (tDate < firstDate) firstDate = tDate;
       }
+
+      let currentD = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
+      while (currentD <= now) {
+        monthlyQuantityMap.set(getPeriodKey(currentD, String(periodicity)), new Map<number, number>());
+        if (periodicity === 'Daily') currentD.setDate(currentD.getDate() + 1);
+        else if (periodicity === 'Weekly') currentD.setDate(currentD.getDate() + 7);
+        else if (periodicity === 'Quarterly') currentD.setMonth(currentD.getMonth() + 3);
+        else if (periodicity === 'Yearly') currentD.setFullYear(currentD.getFullYear() + 1);
+        else currentD.setMonth(currentD.getMonth() + 1);
+      }
+      monthlyQuantityMap.set(getPeriodKey(now, String(periodicity)), new Map<number, number>());
 
       let currentQuantities = new Map<number, number>();
       for (const t of transactions) {
@@ -667,10 +680,10 @@ export class AssetsController {
       let pricesByMonthAndAsset = new Map<string, Map<number, number>>();
       
       let priceGroupExpr = `DATE_FORMAT(price_date, '%Y-%m')`;
-      if (periodicity === 'Diário') priceGroupExpr = `DATE_FORMAT(price_date, '%Y-%m-%d')`;
-      else if (periodicity === 'Semanal') priceGroupExpr = `CONCAT(YEAR(price_date), '-W', LPAD(WEEK(price_date, 1), 2, '0'))`;
-      else if (periodicity === 'Trimestral') priceGroupExpr = `CONCAT(YEAR(price_date), '-Q', QUARTER(price_date))`;
-      else if (periodicity === 'Anual') priceGroupExpr = `DATE_FORMAT(price_date, '%Y')`;
+      if (periodicity === 'Daily') priceGroupExpr = `DATE_FORMAT(price_date, '%Y-%m-%d')`;
+      else if (periodicity === 'Weekly') priceGroupExpr = `CONCAT(YEAR(price_date), '-W', LPAD(WEEK(price_date, 1), 2, '0'))`;
+      else if (periodicity === 'Quarterly') priceGroupExpr = `CONCAT(YEAR(price_date), '-Q', QUARTER(price_date))`;
+      else if (periodicity === 'Yearly') priceGroupExpr = `DATE_FORMAT(price_date, '%Y')`;
       
       if (assetIds.length > 0) {
         const [pricesRows] = await mysqlPool.query(
@@ -815,8 +828,8 @@ export class AssetsController {
         });
       }
 
-      // Retorna até 12 meses ou todos filtrados
-      return res.json(startDate || endDate ? result : result.slice(periodicity === 'Mensal' ? -6 : -12));
+      // Retorna todos os meses gerados ou filtrados
+      return res.json(result);
 
     } catch (error: any) {
        logger.error('Error fetching assets profitability:', error);
@@ -911,15 +924,23 @@ export class AssetsController {
       // Calcular a quantidade acumulada por período
       const monthlyQuantityMap = new Map<string, Map<number, number>>();
       
-      // Inicializar alguns meses para ter um gráfico bonito se não houver muitas transações
       const now = new Date();
-      if (periodicity === 'Mensal') {
-        for (let i = 5; i >= 0; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-          const monthKey = getPeriodKey(d, String(periodicity));
-          monthlyQuantityMap.set(monthKey, new Map<number, number>());
-        }
+      let firstDate = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+      if (transactions.length > 0) {
+        const tDate = new Date(transactions[0].transaction_date);
+        if (tDate < firstDate) firstDate = tDate;
       }
+
+      let currentD = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate());
+      while (currentD <= now) {
+        monthlyQuantityMap.set(getPeriodKey(currentD, String(periodicity)), new Map<number, number>());
+        if (periodicity === 'Daily') currentD.setDate(currentD.getDate() + 1);
+        else if (periodicity === 'Weekly') currentD.setDate(currentD.getDate() + 7);
+        else if (periodicity === 'Quarterly') currentD.setMonth(currentD.getMonth() + 3);
+        else if (periodicity === 'Yearly') currentD.setFullYear(currentD.getFullYear() + 1);
+        else currentD.setMonth(currentD.getMonth() + 1);
+      }
+      monthlyQuantityMap.set(getPeriodKey(now, String(periodicity)), new Map<number, number>());
       
       let currentQuantities = new Map<number, number>();
       
@@ -1016,8 +1037,8 @@ export class AssetsController {
       
       const finalResult = filteredResult.map(r => ({ name: r.name, value: r.value, details: r.details }));
 
-      // Retorna até 12 meses ou todos filtrados, originalmente era slice(-6)
-      return res.json(startDate || endDate ? finalResult : finalResult.slice(periodicity === 'Mensal' ? -6 : -12));
+      // Retorna todos os dados para que o gráfico exiba o histórico completo
+      return res.json(finalResult);
 
     } catch (error: any) {
        logger.error('Error fetching assets history:', error);

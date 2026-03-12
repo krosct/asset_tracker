@@ -202,7 +202,7 @@ export class AuthController {
         );
       }
 
-      return res.json({ message: 'Perfil atualizado' });
+      return res.json({ message: 'Profile updated!' });
 
     } catch (error: any) {
       logger.error('Erro no updateProfile:', error);
@@ -212,7 +212,7 @@ export class AuthController {
         errorMessage = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
       }
       
-      return res.status(400).json({ error: errorMessage || 'Erro ao atualizar perfil' });
+      return res.status(400).json({ error: errorMessage || 'Error while updating profile' });
     }
   }
 
@@ -222,7 +222,7 @@ export class AuthController {
       const email = String(req.body.email).trim().toLowerCase();
       
       if (!email || email === "undefined") {
-        return res.status(400).json({ error: "E-mail inválido ou não fornecido." });
+        return res.status(400).json({ error: "Invalid email." });
       }
 
       // 2. Chamada ao Supabase com Redirect URL configurada
@@ -239,7 +239,7 @@ export class AuthController {
         throw error;
       }
 
-      return res.status(200).json({ message: "Link de recuperação enviado para o seu e-mail." });
+      return res.status(200).json({ message: "Recovery link sent to your email." });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
     }
@@ -252,7 +252,7 @@ export class AuthController {
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) throw error;
-      return res.status(200).json({ message: "Senha alterada com sucesso." });
+      return res.status(200).json({ message: "Password changed successfully!" });
     } catch (error: any) {
       return res.status(400).json({ error: error.message });
     }
