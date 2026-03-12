@@ -18,6 +18,71 @@ const assetSchema = z.object({
 
 const bulkAssetsSchema = z.array(assetSchema)
 
+function getPeriodKey(date: Date, periodicity: string): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  
+  if (periodicity === 'Diário') return `${y}-${m}-${d}`;
+  if (periodicity === 'Semanal') {
+    const firstDayOfYear = new Date(y, 0, 1);
+    const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000;
+    const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+    return `${y}-W${String(weekNum).padStart(2, '0')}`;
+  }
+  if (periodicity === 'Trimestral') {
+    const q = Math.ceil((date.getMonth() + 1) / 3);
+    return `${y}-Q${q}`;
+  }
+  if (periodicity === 'Anual') return `${y}`;
+  
+  return `${y}-${m}`;
+}
+
+function formatPeriodName(key: string, periodicity: string): string {
+  const parts = key.split('-');
+  const y = parts[0].substring(2);
+  
+  if (periodicity === 'Diário') {
+    return `${parts[2]}/${parts[1]}/${y}`;
+  }
+  if (periodicity === 'Semanal') {
+    return `${parts[1]}/${y}`;
+  }
+  if (periodicity === 'Trimestral') {
+    return `${parts[1]}/${y}`;
+  }
+  if (periodicity === 'Anual') {
+    return `${parts[0]}`;
+  }
+  
+  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const m = parseInt(parts[1], 10);
+  return `${monthNames[m - 1]}/${y}`;
+}
+
+function parsePeriodDate(key: string, periodicity: string): Date {
+  const parts = key.split('-');
+  const y = parseInt(parts[0], 10);
+  
+  if (periodicity === 'Diário') {
+    return new Date(y, parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  }
+  if (periodicity === 'Semanal') {
+    const w = parseInt(parts[1].substring(1), 10);
+    return new Date(y, 0, 1 + (w - 1) * 7);
+  }
+  if (periodicity === 'Trimestral') {
+    const q = parseInt(parts[1].substring(1), 10);
+    return new Date(y, (q - 1) * 3, 1);
+  }
+  if (periodicity === 'Anual') {
+    return new Date(y, 0, 1);
+  }
+  
+  return new Date(y, parseInt(parts[1], 10) - 1, 1);
+}
+
 export class AssetsController {
   
   // POST /assets/update-prices
@@ -381,14 +446,17 @@ export class AssetsController {
   static async dividends(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id || 1;
-      const { assetId, assetTypeId, startDate, endDate } = req.query;
+      const { assetId, assetTypeId, startDate, endDate, periodicity = 'Mensal' } = req.query;
 
       let whereClauses = 'a.user_id = ? AND ad.payment_date IS NOT NULL';
       const params: any[] = [userId];
 
       if (assetId) {
-        whereClauses += ' AND a.id = ?';
-        params.push(assetId);
+        const ids = String(assetId).split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+        if (ids.length > 0) {
+          whereClauses += ` AND a.id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        }
       }
       if (assetTypeId) {
         // Se receber string que não é número (ex: 'Ação'), filtra por at.name. Se for ID, filtra por a.asset_type_id.
@@ -412,21 +480,30 @@ export class AssetsController {
       }
 
       // Calcula dividendos multiplicando o valor da cota pela quantidade possuída na data com (ou data de pagamento se nula)
+      let dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y-%m')`;
+      if (periodicity === 'Diário') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y-%m-%d')`;
+      else if (periodicity === 'Semanal') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-W', LPAD(WEEK(ad.payment_date, 1), 2, '0'))`;
+      else if (periodicity === 'Trimestral') dateGroupExpr = `CONCAT(YEAR(ad.payment_date), '-Q', QUARTER(ad.payment_date))`;
+      else if (periodicity === 'Anual') dateGroupExpr = `DATE_FORMAT(ad.payment_date, '%Y')`;
+
       const query = `
         SELECT 
-          DATE_FORMAT(ad.payment_date, '%Y-%m') AS month,
+          ${dateGroupExpr} AS month,
+          a.id AS asset_id,
+          a.symbol AS ticker,
+          at.name AS asset_type,
           SUM(ad.amount * (
             SELECT COALESCE(SUM(CASE WHEN type = 'BUY' THEN quantity ELSE -quantity END), 0)
             FROM transactions t
             WHERE t.asset_id = ad.asset_id 
               AND t.user_id = ?
               AND t.transaction_date <= COALESCE(ad.date_com, ad.payment_date)
-          )) AS total_dividend
+          )) AS asset_dividend
         FROM asset_dividends ad
         JOIN assets a ON a.id = ad.asset_id
         JOIN asset_types at ON at.id = a.asset_type_id
         WHERE ${whereClauses}
-        GROUP BY month
+        GROUP BY month, asset_id, ticker, asset_type
         ORDER BY month ASC
       `;
 
@@ -435,15 +512,55 @@ export class AssetsController {
 
       const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       
-      const result = (rows as any[])
-        .filter(r => r.total_dividend > 0) // Remove meses sem dividendos caso ocorram zerados
-        .map(row => {
-          const [year, m] = row.month.split('-');
-          return {
-            name: `${monthNames[parseInt(m) - 1]}/${year.substring(2)}`,
-            value: Number(Number(row.total_dividend).toFixed(2))
-          };
+      const monthlyData = new Map<string, {
+        total: number,
+        categories: Record<string, number>,
+        assets: { ticker: string, type: string, value: number, quantity: number }[]
+      }>();
+
+      for (const row of rows as any[]) {
+        if (row.asset_dividend <= 0) continue;
+
+        let assetType = row.asset_type;
+        if (typeof assetType === 'string') {
+          const converted = Buffer.from(assetType, 'latin1').toString('utf8');
+          if (!converted.includes('')) {
+            assetType = converted;
+          }
+        }
+
+        if (!monthlyData.has(row.month)) {
+          monthlyData.set(row.month, { total: 0, categories: {}, assets: [] });
+        }
+
+        const data = monthlyData.get(row.month)!;
+        const val = Number(row.asset_dividend);
+        
+        data.total += val;
+        
+        if (!data.categories[assetType]) data.categories[assetType] = 0;
+        data.categories[assetType] += val;
+
+        data.assets.push({
+          ticker: row.ticker,
+          type: assetType,
+          value: val,
+          quantity: 0 // Quantidade não é tão relevante em dividendos diretamente, mas mantemos por compatibilidade estrutural
         });
+      }
+
+      const result = Array.from(monthlyData.entries()).map(([month, data]) => {
+        data.assets.sort((a, b) => b.value - a.value);
+
+        return {
+          name: formatPeriodName(month, String(periodicity)),
+          value: Number(data.total.toFixed(2)),
+          details: {
+            categories: data.categories,
+            assets: data.assets
+          }
+        };
+      });
 
       return res.json(result);
 
@@ -457,14 +574,17 @@ export class AssetsController {
   static async profitability(req: Request, res: Response) {
     try {
       const userId = (req as any).user?.id || 1; // Assuming auth middleware sets req.user
-      const { assetId, assetTypeId, startDate, endDate } = req.query;
+      const { assetId, assetTypeId, startDate, endDate, periodicity = 'Mensal' } = req.query;
 
       let whereClauses = 't.user_id = ?';
       const params: any[] = [userId];
 
       if (assetId) {
-        whereClauses += ' AND t.asset_id = ?';
-        params.push(assetId);
+        const ids = String(assetId).split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+        if (ids.length > 0) {
+          whereClauses += ` AND t.asset_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        }
       }
       if (assetTypeId) {
         // Se receber string que não é número (ex: 'Ação'), filtra por at.name. Se for ID, filtra por a.asset_type_id.
@@ -499,16 +619,18 @@ export class AssetsController {
       // Build monthly quantities
       const monthlyQuantityMap = new Map<string, Map<number, number>>();
       const now = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        monthlyQuantityMap.set(monthKey, new Map<number, number>());
+      if (periodicity === 'Mensal') {
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthKey = getPeriodKey(d, String(periodicity));
+          monthlyQuantityMap.set(monthKey, new Map<number, number>());
+        }
       }
 
       let currentQuantities = new Map<number, number>();
       for (const t of transactions) {
         const date = new Date(t.transaction_date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthKey = getPeriodKey(date, String(periodicity));
         
         let qty = currentQuantities.get(t.asset_id) || 0;
         if (t.type === 'BUY') {
@@ -544,16 +666,22 @@ export class AssetsController {
       const assetIds = Array.from(currentQuantities.keys());
       let pricesByMonthAndAsset = new Map<string, Map<number, number>>();
       
+      let priceGroupExpr = `DATE_FORMAT(price_date, '%Y-%m')`;
+      if (periodicity === 'Diário') priceGroupExpr = `DATE_FORMAT(price_date, '%Y-%m-%d')`;
+      else if (periodicity === 'Semanal') priceGroupExpr = `CONCAT(YEAR(price_date), '-W', LPAD(WEEK(price_date, 1), 2, '0'))`;
+      else if (periodicity === 'Trimestral') priceGroupExpr = `CONCAT(YEAR(price_date), '-Q', QUARTER(price_date))`;
+      else if (periodicity === 'Anual') priceGroupExpr = `DATE_FORMAT(price_date, '%Y')`;
+      
       if (assetIds.length > 0) {
         const [pricesRows] = await mysqlPool.query(
           `
-          SELECT asset_id, DATE_FORMAT(price_date, '%Y-%m') as month, close_price 
+          SELECT asset_id, ${priceGroupExpr} as month, close_price 
           FROM asset_daily_prices 
           WHERE asset_id IN (?)
           AND (asset_id, price_date) IN (
               SELECT asset_id, MAX(price_date) 
               FROM asset_daily_prices 
-              GROUP BY asset_id, DATE_FORMAT(price_date, '%Y-%m')
+              GROUP BY asset_id, ${priceGroupExpr}
           )
           `,
           [assetIds]
@@ -570,10 +698,14 @@ export class AssetsController {
 
       // We need default current prices if no daily price for a month
       const [assetsRows] = await mysqlPool.query(
-        `SELECT id, 
-                COALESCE((SELECT current_price FROM asset_daily_prices WHERE asset_id = assets.id ORDER BY price_date DESC LIMIT 1), current_price) as current_price, 
-                avg_price 
-         FROM assets WHERE user_id = ?`,
+        `SELECT a.id, 
+                a.symbol as ticker,
+                at.name as asset_type,
+                COALESCE((SELECT current_price FROM asset_daily_prices WHERE asset_id = a.id ORDER BY price_date DESC LIMIT 1), a.current_price) as current_price, 
+                a.avg_price 
+         FROM assets a
+         LEFT JOIN asset_types at ON a.asset_type_id = at.id
+         WHERE a.user_id = ?`,
         [userId]
       );
       const defaultPricesMap = new Map();
@@ -583,12 +715,22 @@ export class AssetsController {
 
       // Calculate value per month
       let previousValue = 0;
+      let previousPricesMap = new Map<number, number>();
+      let previousAssetsValue = new Map<number, number>();
       const result = [];
 
       for (const month of sortedMonths) {
         const monthQuantities = monthlyQuantityMap.get(month)!;
         let monthTotal = 0;
         
+        const details = {
+          categories: {} as Record<string, number>,
+          assets: [] as { ticker: string, type: string, value: number, quantity: number }[]
+        };
+        
+        let categoriesWeightedReturn = {} as Record<string, number>;
+        let categoriesPrevValue = {} as Record<string, number>;
+
         for (const [assetId, qty] of Array.from(monthQuantities.entries())) {
            let price = 0;
            if (pricesByMonthAndAsset.has(month) && pricesByMonthAndAsset.get(month)!.has(assetId)) {
@@ -596,25 +738,69 @@ export class AssetsController {
            } else {
              price = defaultPricesMap.get(assetId) || 0;
            }
-           monthTotal += qty * price;
+           
+           const val = qty * price;
+           monthTotal += val;
+           
+           if (qty > 0 || (previousAssetsValue.has(assetId) && previousAssetsValue.get(assetId)! > 0)) {
+             const prevPrice = previousPricesMap.get(assetId) || price;
+             const prevVal = previousAssetsValue.get(assetId) || 0;
+             
+             let assetProf = 0;
+             if (prevPrice > 0 && previousPricesMap.has(assetId)) {
+               assetProf = ((price - prevPrice) / prevPrice) * 100;
+             }
+             
+             const info = (assetsRows as any[]).find((a: any) => a.id === assetId) || { ticker: 'Desconhecido', asset_type: 'Outros' };
+             let assetType = info.asset_type;
+             if (typeof assetType === 'string') {
+               const converted = Buffer.from(assetType, 'latin1').toString('utf8');
+               if (!converted.includes('')) assetType = converted;
+             }
+             
+             if (!categoriesWeightedReturn[assetType]) categoriesWeightedReturn[assetType] = 0;
+             if (!categoriesPrevValue[assetType]) categoriesPrevValue[assetType] = 0;
+             
+             // O retorno da categoria deve ponderar pelo valor que o ativo tinha no mês anterior
+             // Se não tinha valor no mês anterior, não influencia a rentabilidade % do mês da categoria
+             categoriesWeightedReturn[assetType] += prevVal * assetProf;
+             categoriesPrevValue[assetType] += prevVal;
+             
+             if (prevVal > 0 || val > 0) {
+               details.assets.push({
+                 ticker: info.ticker,
+                 type: assetType,
+                 value: assetProf,
+                 quantity: qty
+               });
+             }
+           }
+           
+           previousPricesMap.set(assetId, price);
+           previousAssetsValue.set(assetId, val);
         }
+        
+        for (const [cat, prevCatVal] of Object.entries(categoriesPrevValue)) {
+           let catProf = 0;
+           if (prevCatVal > 0) {
+             catProf = categoriesWeightedReturn[cat] / prevCatVal;
+           }
+           details.categories[cat] = catProf;
+        }
+        
+        details.assets.sort((a, b) => b.value - a.value);
         
         // Simple profitability calculation: (Current Value - Previous Value) / Previous Value (Not accounting for cash flows precisely for simplicity, but better than nothing)
         let profitability = 0;
         if (previousValue > 0) {
            profitability = ((monthTotal - previousValue) / previousValue) * 100;
         } else if (previousValue === 0 && monthTotal > 0) {
-           // First month with money, can't really calculate % return
            profitability = 0; 
         }
 
         previousValue = monthTotal;
 
-        const [year, m] = month.split('-');
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        
-        // Aplica filtro de datas no resultado, se houver
-        const monthDate = new Date(parseInt(year), parseInt(m) - 1, 1);
+        const monthDate = parsePeriodDate(month, String(periodicity));
         if (startDate && monthDate < new Date(String(startDate))) continue;
         if (endDate) {
           const eDate = new Date(String(endDate));
@@ -623,13 +809,14 @@ export class AssetsController {
         }
 
         result.push({
-          name: `${monthNames[parseInt(m) - 1]}`,
-          value: Number(profitability.toFixed(2))
+          name: formatPeriodName(month, String(periodicity)),
+          value: Number(profitability.toFixed(2)),
+          details
         });
       }
 
-      // Retorna até 12 meses ou todos filtrados, originalmente era slice(-6)
-      return res.json(startDate || endDate ? result : result.slice(-6));
+      // Retorna até 12 meses ou todos filtrados
+      return res.json(startDate || endDate ? result : result.slice(periodicity === 'Mensal' ? -6 : -12));
 
     } catch (error: any) {
        logger.error('Error fetching assets profitability:', error);
@@ -641,14 +828,17 @@ export class AssetsController {
   static async history(req: Request, res: Response) {
     try {
       const userId = 1;
-      const { assetId, assetTypeId, startDate, endDate } = req.query;
+      const { assetId, assetTypeId, startDate, endDate, periodicity = 'Mensal' } = req.query;
 
       let whereClauses = 't.user_id = ?';
       const params: any[] = [userId];
 
       if (assetId) {
-        whereClauses += ' AND t.asset_id = ?';
-        params.push(assetId);
+        const ids = String(assetId).split(',').map(id => Number(id.trim())).filter(id => !isNaN(id));
+        if (ids.length > 0) {
+          whereClauses += ` AND t.asset_id IN (${ids.map(() => '?').join(',')})`;
+          params.push(...ids);
+        }
       }
       if (assetTypeId) {
         // Se receber string que não é número (ex: 'Ação'), filtra por at.name. Se for ID, filtra por a.asset_type_id.
@@ -690,36 +880,52 @@ export class AssetsController {
       // Agrupar e calcular saldo mensal
       // Isso seria mais preciso usando asset_daily_prices, mas vamos fazer um mock/calculo simples baseado nas transacoes ou precos atuais
       
-      // Busca preços atuais
+      // Busca preços atuais e informações dos ativos
       const [assetsRows] = await mysqlPool.query(
-        `SELECT id, 
-                COALESCE((SELECT current_price FROM asset_daily_prices WHERE asset_id = assets.id ORDER BY price_date DESC LIMIT 1), current_price) as current_price, 
-                avg_price 
-         FROM assets WHERE user_id = ?`,
+        `SELECT a.id, 
+                a.symbol as ticker,
+                at.name as asset_type,
+                COALESCE((SELECT current_price FROM asset_daily_prices WHERE asset_id = a.id ORDER BY price_date DESC LIMIT 1), a.current_price) as current_price, 
+                a.avg_price 
+         FROM assets a
+         LEFT JOIN asset_types at ON a.asset_type_id = at.id
+         WHERE a.user_id = ?`,
         [userId]
       );
       
       const pricesMap = new Map();
+      const assetsInfoMap = new Map();
       (assetsRows as any[]).forEach(row => {
+        let assetType = row.asset_type;
+        if (typeof assetType === 'string') {
+          const converted = Buffer.from(assetType, 'latin1').toString('utf8');
+          if (!converted.includes('')) {
+            assetType = converted;
+          }
+        }
+        
         pricesMap.set(row.id, row.current_price > 0 ? row.current_price : row.avg_price);
+        assetsInfoMap.set(row.id, { ticker: row.ticker, type: assetType || 'Outros' });
       });
 
-      // Calcular a quantidade acumulada por mês
+      // Calcular a quantidade acumulada por período
       const monthlyQuantityMap = new Map<string, Map<number, number>>();
       
       // Inicializar alguns meses para ter um gráfico bonito se não houver muitas transações
       const now = new Date();
-      for (let i = 5; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-        monthlyQuantityMap.set(monthKey, new Map<number, number>());
+      if (periodicity === 'Mensal') {
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthKey = getPeriodKey(d, String(periodicity));
+          monthlyQuantityMap.set(monthKey, new Map<number, number>());
+        }
       }
       
       let currentQuantities = new Map<number, number>();
       
       for (const t of transactions) {
         const date = new Date(t.transaction_date);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthKey = getPeriodKey(date, String(periodicity));
         
         let qty = currentQuantities.get(t.asset_id) || 0;
         if (t.type === 'BUY') {
@@ -745,6 +951,8 @@ export class AssetsController {
       const sortedMonths = Array.from(monthlyQuantityMap.keys()).sort();
       let lastMonthQuantities = new Map<number, number>();
       
+      const historyDetailsMap = new Map<string, any>();
+      
       for (const month of sortedMonths) {
         const monthQuantities = monthlyQuantityMap.get(month)!;
         
@@ -759,21 +967,39 @@ export class AssetsController {
         
         // Calcula valor total do mês
         let monthTotal = 0;
+        let details = {
+          categories: {} as Record<string, number>,
+          assets: [] as { ticker: string, type: string, value: number, quantity: number }[]
+        };
+
         for (const [assetId, qty] of Array.from(monthQuantities.entries())) {
+           if (qty <= 0) continue;
            const price = pricesMap.get(assetId) || 0;
-           monthTotal += qty * price;
+           const val = qty * price;
+           
+           if (val > 0) {
+             monthTotal += val;
+             const info = assetsInfoMap.get(assetId) || { ticker: 'Desconhecido', type: 'Outros' };
+             
+             if (!details.categories[info.type]) details.categories[info.type] = 0;
+             details.categories[info.type] += val;
+
+             details.assets.push({ ticker: info.ticker, type: info.type, value: val, quantity: qty });
+           }
         }
         
+        details.assets.sort((a, b) => b.value - a.value);
+        
         historyMap.set(month, monthTotal);
+        historyDetailsMap.set(month, details);
       }
 
       const result = sortedMonths.map(month => {
-        const [year, m] = month.split('-');
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         return {
-          monthDate: new Date(parseInt(year), parseInt(m) - 1, 1),
-          name: `${monthNames[parseInt(m) - 1]}/${year.substring(2)}`,
-          value: historyMap.get(month) || 0
+          monthDate: parsePeriodDate(month, String(periodicity)),
+          name: formatPeriodName(month, String(periodicity)),
+          value: historyMap.get(month) || 0,
+          details: historyDetailsMap.get(month)
         };
       });
 
@@ -788,10 +1014,10 @@ export class AssetsController {
         filteredResult = filteredResult.filter(r => r.monthDate <= eDate);
       }
       
-      const finalResult = filteredResult.map(r => ({ name: r.name, value: r.value }));
+      const finalResult = filteredResult.map(r => ({ name: r.name, value: r.value, details: r.details }));
 
       // Retorna até 12 meses ou todos filtrados, originalmente era slice(-6)
-      return res.json(startDate || endDate ? finalResult : finalResult.slice(-6));
+      return res.json(startDate || endDate ? finalResult : finalResult.slice(periodicity === 'Mensal' ? -6 : -12));
 
     } catch (error: any) {
        logger.error('Error fetching assets history:', error);

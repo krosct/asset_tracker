@@ -10,6 +10,8 @@ import { ProfitabilityChartComponent } from "./ProfitabilityChartComponent";
 import { DividendsChartComponent } from "./DividendsChartComponent";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/lib/api";
 
 interface ChartTabsProps {
@@ -25,8 +27,9 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
   
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [assetId, setAssetId] = useState("all");
+  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
   const [assetTypeId, setAssetTypeId] = useState("all");
+  const [periodicity, setPeriodicity] = useState("Mensal");
 
   const [loading, setLoading] = useState(false);
 
@@ -40,8 +43,9 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
         const params: any = {};
         if (startDate) params.startDate = startDate;
         if (endDate) params.endDate = endDate;
-        if (assetId && assetId !== "all") params.assetId = assetId;
+        if (selectedAssets.length > 0) params.assetId = selectedAssets.join(',');
         if (assetTypeId && assetTypeId !== "all") params.assetTypeId = assetTypeId;
+        if (periodicity) params.periodicity = periodicity;
         
         const [histRes, profRes, divRes] = await Promise.all([
           api.get('/assets/history', { params }),
@@ -61,7 +65,7 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
     
     // Só faz fetch se algum filtro for aplicado, caso contrário usa os iniciais ou busca inicial
     fetchFilteredData();
-  }, [startDate, endDate, assetId, assetTypeId]);
+  }, [startDate, endDate, selectedAssets, assetTypeId, periodicity]);
 
   return (
     <div className="w-full mt-8 space-y-6">
@@ -93,18 +97,59 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
                   <h4 className="font-medium text-sm leading-none mb-4">Filtros do Gráfico</h4>
                   
                   <div className="flex flex-col gap-1.5 w-full">
-                    <label className="text-xs text-muted-foreground font-medium">Ativo Específico</label>
-                    <Select value={assetId} onValueChange={setAssetId}>
+                    <label className="text-xs text-muted-foreground font-medium">Visualização</label>
+                    <Select value={periodicity} onValueChange={setPeriodicity}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Todos os Ativos" />
+                        <SelectValue placeholder="Mensal" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos os Ativos</SelectItem>
-                        {assets.map((a: any) => (
-                          <SelectItem key={a.id} value={String(a.id)}>{a.ticker}</SelectItem>
-                        ))}
+                        <SelectItem value="Diário">Diário</SelectItem>
+                        <SelectItem value="Semanal">Semanal</SelectItem>
+                        <SelectItem value="Mensal">Mensal</SelectItem>
+                        <SelectItem value="Trimestral">Trimestral</SelectItem>
+                        <SelectItem value="Anual">Anual</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1.5 w-full">
+                    <label className="text-xs text-muted-foreground font-medium">Ativos Específicos</label>
+                    <div className="border rounded-md p-2">
+                      <ScrollArea className="h-[120px] pr-3">
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox 
+                              id="all-assets" 
+                              checked={selectedAssets.length === 0}
+                              onCheckedChange={(checked) => {
+                                if (checked) setSelectedAssets([]);
+                              }}
+                            />
+                            <label htmlFor="all-assets" className="text-sm font-medium leading-none cursor-pointer">
+                              Todos os Ativos
+                            </label>
+                          </div>
+                          {assets.map((a: any) => (
+                            <div key={a.id} className="flex items-center space-x-2">
+                              <Checkbox 
+                                id={`asset-${a.id}`} 
+                                checked={selectedAssets.includes(String(a.id))}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedAssets(prev => [...prev, String(a.id)]);
+                                  } else {
+                                    setSelectedAssets(prev => prev.filter(id => id !== String(a.id)));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`asset-${a.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                                {a.ticker}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </div>
 
                   <div className="flex flex-col gap-1.5 w-full">
@@ -145,15 +190,16 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
                   </div>
                   
                   {/* Botão de limpar filtros opcional */}
-                  {(startDate || endDate || assetId !== 'all' || assetTypeId !== 'all') && (
+                  {(startDate || endDate || selectedAssets.length > 0 || assetTypeId !== 'all' || periodicity !== 'Mensal') && (
                     <Button 
                       variant="ghost" 
                       className="w-full text-xs text-muted-foreground mt-2 h-8"
                       onClick={() => {
                         setStartDate("");
                         setEndDate("");
-                        setAssetId("all");
+                        setSelectedAssets([]);
                         setAssetTypeId("all");
+                        setPeriodicity("Mensal");
                       }}
                     >
                       Limpar Filtros
@@ -167,17 +213,17 @@ export function ChartTabs({ historyData: initialHistory, profitabilityData: init
         
         <TabsContent value="patrimonio" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
-          <BarChartComponent data={historyData} />
+          <BarChartComponent data={historyData} periodicity={periodicity} />
         </TabsContent>
         
         <TabsContent value="rentabilidade" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
-          <ProfitabilityChartComponent data={profitabilityData} />
+          <ProfitabilityChartComponent data={profitabilityData} periodicity={periodicity} />
         </TabsContent>
 
         <TabsContent value="dividendos" className="mt-0 relative">
           {loading && <div className="absolute inset-0 z-10 bg-background/50 flex items-center justify-center backdrop-blur-sm">Carregando...</div>}
-          <DividendsChartComponent data={dividendsData} />
+          <DividendsChartComponent data={dividendsData} periodicity={periodicity} />
         </TabsContent>
       </Tabs>
     </div>

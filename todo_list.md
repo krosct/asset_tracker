@@ -10,5 +10,12 @@
 - [x] feat: Grafico de dividendos
 - [x] feat: Valor do ativo, variação e valor total atualizado em "tempo real" (5min)
 - [x] fix: Quando um ativo é adicionado a carteira, o preço atual deve ser atualizado.
-- [ ] fix: Cor do gráfico de dividendo para verde
-- [ ] feat: Criar filtro para gráfico de dividendo por unidade de ativo ou valor total
+- [x] fix: Cor do gráfico de dividendo para verde
+- [x] feat: Criar filtro para gráfico de dividendo por unidade de ativo ou valor total
+- [ ] fix: Retirar dummyData de ./frontend/components/dashboard/BarChartComponent.tsx
+- [x] fix: Ajustar e consertar filtro em 'Transactions'
+- [x] feat: Adicionar janelas de tempo nos graficos
+- [ ] fix: Alterar para verde a cor da borda do grafico de dividendos
+- [ ] fix: Ajustar as porcentagens do detalhamento: de categoria e de ativos
+- [ ] fix: Quando uma categoria for completamente excluida, ela deve ser apagada do banco de dados
+- [ ] feat: Concluir CRUD de transactions

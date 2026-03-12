@@ -31,8 +31,6 @@ export default function DashboardPage() {
   const { displayedTransactions, filters, sorting } = useTransactionFilters(transactions)
 
   // Estados de UI originais
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
   const [showFilterPanel, setShowFilterPanel] = useState(false)
   const [selectedAssetTypeFilter, setSelectedAssetTypeFilter] = useState<string | null>(null)
   const [addAssetOpen, setAddAssetOpen] = useState(false)
@@ -44,12 +42,6 @@ export default function DashboardPage() {
       router.push("/login")
     }
   }, [isAuthenticated, authLoading, router])
-
-  const clearFilters = () => {
-    setStartDate("")
-    setEndDate("")
-    refresh({ start: "", end: "" })
-  }
 
   const handleLogout = () => {
     logout()
@@ -172,29 +164,21 @@ export default function DashboardPage() {
                     <p className="text-sm text-muted-foreground">History</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Input 
-                      type="date" 
-                      value={startDate} 
-                      onChange={(e) => setStartDate(e.target.value)} 
-                      className="w-auto [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert-[48%] [&::-webkit-calendar-picker-indicator]:sepia-[79%] [&::-webkit-calendar-picker-indicator]:saturate-[2476%] [&::-webkit-calendar-picker-indicator]:hue-rotate-[130deg] [&::-webkit-calendar-picker-indicator]:brightness-[96%] [&::-webkit-calendar-picker-indicator]:contrast-[101%]"
-                    />
-                    <span className="text-muted-foreground">-</span>
-                    <Input 
-                      type="date" 
-                      value={endDate} 
-                      onChange={(e) => setEndDate(e.target.value)} 
-                      className="w-auto [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert-[48%] [&::-webkit-calendar-picker-indicator]:sepia-[79%] [&::-webkit-calendar-picker-indicator]:saturate-[2476%] [&::-webkit-calendar-picker-indicator]:hue-rotate-[130deg] [&::-webkit-calendar-picker-indicator]:brightness-[96%] [&::-webkit-calendar-picker-indicator]:contrast-[101%]"
-                    />
-                    <Button
-                      onClick={() => setShowFilterPanel(!showFilterPanel)}
-                      variant="secondary"
-                      size="icon"
-                      title="Filtros e ordenação"
-                    >
-                      <Filter className="h-4 w-4" />
-                    </Button>
-                    {(startDate || endDate) && (
-                      <Button onClick={clearFilters} variant="destructive" size="icon" title="Limpar Filtros">
+                    <TransactionFiltersPanel filters={filters} sorting={sorting} assets={assets} />
+                    {((filters.filterStartDate || filters.filterEndDate || filters.filterTickers.length > 0 || filters.filterMinTotal || filters.filterMaxTotal || filters.filterMinQuantity || filters.filterMaxQuantity || filters.filterMinUnitPrice || filters.filterMaxUnitPrice || filters.filterType !== 'all' || filters.filterAssetType !== 'all')) && (
+                      <Button onClick={() => {
+                        filters.setFilterTickers([])
+                        filters.setFilterStartDate("")
+                        filters.setFilterEndDate("")
+                        filters.setFilterMinTotal("")
+                        filters.setFilterMaxTotal("")
+                        filters.setFilterMinQuantity("")
+                        filters.setFilterMaxQuantity("")
+                        filters.setFilterMinUnitPrice("")
+                        filters.setFilterMaxUnitPrice("")
+                        filters.setFilterType("all")
+                        filters.setFilterAssetType("all")
+                      }} variant="destructive" size="icon" title="Limpar Filtros">
                         <X className="h-4 w-4" />
                       </Button>
                     )}
@@ -204,9 +188,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {showFilterPanel && (
-                  <TransactionFiltersPanel filters={filters} sorting={sorting} />
-                )}
                 <TransactionsList transactions={displayedTransactions} />
               </div>
             </div>
